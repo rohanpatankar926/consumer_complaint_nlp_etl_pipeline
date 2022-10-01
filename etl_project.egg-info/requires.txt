@@ -1,0 +1,4 @@
+findspark
+pyspark==3.2.1
+request
+six

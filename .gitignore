@@ -1,0 +1,4 @@
+airflow/logs/
+airflow/airflow.db
+dist
+*.__pycache__

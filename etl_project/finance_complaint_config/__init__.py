@@ -1,0 +1,1 @@
+from finance_complaint_config.config import ExtractConfig

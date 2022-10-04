@@ -2,3 +2,4 @@ airflow/logs/
 airflow/airflow.db
 dist
 *.__pycache__
+data

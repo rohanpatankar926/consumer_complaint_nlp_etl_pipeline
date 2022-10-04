@@ -29,7 +29,7 @@ class CONSUMER_COMPLAINT_ANALYSIS:
     def __init__(self):
         pass
 
-    def download_data(self,url:str,download_dir:str)->str:
+    def download_data(self,download_dir:str)->str:
         # logging.info(f"removing {download_dir} if exists")
         if os.path.exists(download_dir):
             shutil.rmtree(download_dir)
@@ -37,9 +37,11 @@ class CONSUMER_COMPLAINT_ANALYSIS:
         logging.info(f"creating {download_dir} directory")
         os.makedirs(download_dir,exist_ok=True)
         # logging.info(f"downloading file from {url}")
-        self.file_name=os.path.basename(url).replace(".zip","")
-        self.download_file_path=os.path.join(download_dir,self.file_name)
-        urllib.request.urlretrieve(url,self.download_file_path)
+        # self.file_name=os.path.basename(url).replace(".zip","")
+        # self.download_file_path=os.path.join(download_dir,self.file_name)
+        # urllib.request.urlretrieve(url,self.download_file_path)
+        self.filename="complaints.csv.zip"
+        self.download_file_path=os.path.join("data",self.filename)
         return self.download_file_path
 
     def extract_data(self,zip_file_path:str,extract_file_dir:str)->str:
@@ -68,20 +70,21 @@ class CONSUMER_COMPLAINT_ANALYSIS:
             source_file_path=source_file_path[1:]
         source_file_path=f"{self.local_file_start_path}{source_file_path}"
         print(source_file_path) 
-        self.dataframe=spark.read.json(source_file_path)
-        print(f"Number of record in downloaded file: {self.dataframe.select('complaint_id').count()}")
-        self.current_complaint_df = self.dataframe.drop(self.dataframe._corrupt_record)
-        self.current_complaint_df=self.current_complaint_df.where(self.current_complaint_df.complaint_id.isNotNull())
+        self.dataframe=spark.read.csv(source_file_path,header=True)
+        print(f"Number of record in downloaded file: {self.dataframe.select('Complaint ID').count()}")
+        self.data=self.dataframe.withColumnRenamed("Date received","date_recieved").withColumnRenamed("Consumer complaint narrative","consumer_complaint_narrative").withColumnRenamed("Company public response","company_public_response").withColumnRenamed("ZIP code","zip_code").withColumnRenamed("Consumer consent provided?","consumer_consent_provided").withColumnRenamed("Submitted via","submitted_via").withColumnRenamed("Date sent to company","Date_sent_to_company").withColumnRenamed("Company response to consumer","company_response_to_consumer").withColumnRenamed("Timely response?","timely_response").withColumnRenamed("Consumer disputed?","consumer_disputed").withColumnRenamed("Complaint ID","complaint_id")     
+        # self.current_complaint_df = self.dataframe.drop(self.dataframe["Date received"])
+        self.current_complaint_df=self.data.where(self.data["complaint_id"].isNotNull())
         if self.is_hdfs_file_present(hadoop_file_path):
             existing_complaints_data=spark.read.parquet(hadoop_file_path)
             print(f"Number of records in data we have is:{existing_complaints_data.select('complaint_id').count()}")
-            self.selected_compalint_id=self.dataframe.join(existing_complaints_data,self.dataframe.complaint_id==existing_complaints_data.complaint_id,how="left").select(self.dataframe.complaint_id)
-            self.current_complaint_df=self.current_complaint_df.join(self.selected_compalint_id,self.current_complaint_df.complaint_id==self.selected_compalint_id.complaint_id,how="inner").drop(self.selected_compalint_id.complaint_id)
+            self.selected_compalint_id=self.data.join(existing_complaints_data,self.data["complaint_id"]==existing_complaints_data["complaint_id"],how="left").select(self.data["complaint_id"])
+            self.current_complaint_df=self.current_complaint_df.join(self.selected_compalint_id,self.current_complaint_df["complaint_id"]==self.selected_compalint_id["complaint_id"],how="inner").drop(self.selected_compalint_id["complaint_id"])
             print(f"Number of records in current data is:{self.current_complaint_df.select('complaint_id').count()}")
             self.current_complaint_df.write.mode("append").parquet(hadoop_file_path)
         else:
             self.current_complaint_df.write.parquet(hadoop_file_path)
-        print(f"Number of records in data we have is:{existing_complaints_data.select('complaint_id').count()}")
+        # print(f"Number of records in data we have is:{existing_complaints_data.select('complaint_id').count()}")
 
 
 defullt_args={
@@ -98,20 +101,20 @@ defullt_args={
 with DAG(
     dag_id="consumer_complaints_analysis",
     default_args=defullt_args,
-    schedule_interval="@daily",
+    schedule_interval="@once",
     max_active_runs=1,
     tags=["consumer_complaints_analysis"]
 ) as dag:
    
     def finance_config(**kwargs):
         finance_config_data=kwargs["ti"]
-        url="https://files.consumerfinance.gov/ccdb/complaints.json.zip"
+        # url="https://files.consumerfinance.gov/ccdb/complaints.json.zip"
         download_dir="/consumer_complaint_analysis/finance/data/zip"
         extract_dir="/consumer_complaint_analysis/finance/data/json"
         hdfs_file="/user/root/consumer_complaints_analysis/finance_data.parquet"
 
-        config={URL_KEY:url}
-        config[DOWNLOAD_DIR_KEY]=download_dir
+        config={DOWNLOAD_DIR_KEY:download_dir}
+        # config[DOWNLOAD_DIR_KEY]=download_dir
         config[EXTRACT_DIR_KEY]=extract_dir
         config[HDFS_FILE_KEY]=hdfs_file
 
@@ -120,9 +123,9 @@ with DAG(
     def download_data(**kwargs):
         finance_config_data=kwargs["ti"]
         config=finance_config_data.xcom_pull(task_ids="finance_config",key=FINANCE_CONFIG_INFO_KEY)
-        url=config[URL_KEY]
+        # url=config[URL_KEY]
         download_dir=config[DOWNLOAD_DIR_KEY]
-        zip_file_path=CONSUMER_COMPLAINT_ANALYSIS().download_data(url,download_dir)
+        zip_file_path=CONSUMER_COMPLAINT_ANALYSIS().download_data(download_dir)
         config[ZIP_FILE_PATH]=zip_file_path
         finance_config_data.xcom_push(key=FINANCE_CONFIG_INFO_KEY,value=config)
 

@@ -30,23 +30,7 @@
         "Complaint ID":"Object"
     },
     "Independent_feature":[
-        "Date recieved",
-        "Sub-product",
-        "Issue",
-        "Sub-issue",
-        "Consumer complaint narrative",
-        "Company public response",
-        "Company",
-        "State",
-        "ZIP code",
-        "Tags",
-        "Consumer consent provided?",
-        "Submitted via",
-        "Date sent to company",
-        "Company response to consumer",
-        "Timely response?",
         "Consumer disputed?",
-        "Complaint ID"
     ],
     "Dependent_feature":["Product"]
 }
